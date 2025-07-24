@@ -555,6 +555,10 @@ export class CameraSource extends UploaderBlock {
    */
   _toSend = (file) => {
     this.api.addFileFromObject(file, { source: UploadSource.CAMERA });
+
+    // Properly deactivate camera activity before switching to upload list
+    this._stopCapture();
+
     this.set$({
       '*currentActivity': ActivityBlock.activities.UPLOAD_LIST,
     });
@@ -622,23 +626,68 @@ export class CameraSource extends UploaderBlock {
   _makeStreamInactive = () => {
     if (!this._stream) return false;
 
-    const audioTracks = this._stream?.getAudioTracks();
-    const videoTracks = this._stream?.getVideoTracks();
+    const audioTracks = this._stream.getAudioTracks();
+    const videoTracks = this._stream.getVideoTracks();
 
-    /** @type {MediaStreamTrack[]} */ (audioTracks).forEach((track) => track.stop());
-    /** @type {MediaStreamTrack[]} */ (videoTracks).forEach((track) => track.stop());
+    // Stop all audio tracks
+    audioTracks.forEach((track) => {
+      if (track.readyState !== 'ended') {
+        track.stop();
+      }
+    });
+
+    // Stop all video tracks
+    videoTracks.forEach((track) => {
+      if (track.readyState !== 'ended') {
+        track.stop();
+      }
+    });
+
+    return true;
   };
 
-  _stopCapture = () => {
+    _stopCapture = () => {
     if (this._capturing) {
-      this.ref.video.volume = 0;
-      this.$.video?.getTracks()[0].stop();
+      // Clear the reactive video property first
       this.$.video = null;
 
+      // Clear the video element's srcObject to release camera access
+      if (this.ref.video) {
+        // Clear srcObject multiple times to ensure it's released
+        this.ref.video.srcObject = null;
+        this.ref.video.volume = 0;
+        // Force video element to stop and clear any remaining references
+        this.ref.video.pause();
+        this.ref.video.currentTime = 0;
+        // Clear srcObject again after pause
+        this.ref.video.srcObject = null;
+      }
+
+      // Stop all tracks in the stream
       this._makeStreamInactive();
+
+      // Clear the stream reference
+      this._stream = null;
+
       this._stopTimer();
 
       this._capturing = false;
+
+      // Force garbage collection hint for macOS
+      if (window.gc) {
+        try {
+          window.gc();
+        } catch (e) {
+          // Ignore if gc is not available
+        }
+      }
+
+      // Additional cleanup after a short delay to ensure srcObject is cleared
+      setTimeout(() => {
+        if (this.ref.video) {
+          this.ref.video.srcObject = null;
+        }
+      }, 50);
     }
   };
 
@@ -775,7 +824,50 @@ export class CameraSource extends UploaderBlock {
       this._setPermissionsState('denied');
     }
 
+    // Ensure camera is properly stopped and cleaned up
     this._stopCapture();
+
+            // Additional cleanup to ensure video element is completely cleared
+    if (this.ref.video) {
+      // Clear srcObject multiple times to ensure it's released
+      this.ref.video.srcObject = null;
+      this.ref.video.src = '';
+      this.ref.video.load();
+      // Force video element to stop completely
+      this.ref.video.pause();
+      this.ref.video.currentTime = 0;
+      // Clear srcObject again after pause
+      this.ref.video.srcObject = null;
+      // Remove all event listeners
+      this.ref.video.onloadedmetadata = null;
+      this.ref.video.oncanplay = null;
+      this.ref.video.onplay = null;
+      this.ref.video.onpause = null;
+    }
+
+    // Clear any remaining references
+    this._stream = null;
+    this._mediaRecorder = null;
+    this._chunks = [];
+
+    // Force multiple delays to ensure srcObject is cleared (helps with macOS)
+    setTimeout(() => {
+      if (this.ref.video) {
+        this.ref.video.srcObject = null;
+      }
+    }, 50);
+
+    setTimeout(() => {
+      if (this.ref.video) {
+        this.ref.video.srcObject = null;
+      }
+    }, 200);
+
+    setTimeout(() => {
+      if (this.ref.video) {
+        this.ref.video.srcObject = null;
+      }
+    }, 500);
   };
 
   /** @param {CameraMode[]} cameraModes */
@@ -809,6 +901,16 @@ export class CameraSource extends UploaderBlock {
       if (!this.isActivityActive) return;
       const cameraModes = deserializeCsv(val);
       this._handleCameraModes(cameraModes);
+    });
+
+    // Listen for upload completion to ensure camera is fully cleaned up
+    this.sub('*collectionState', (collectionState) => {
+      if (collectionState && collectionState.status === 'success' && this._capturing) {
+        // Upload completed, ensure camera is fully stopped
+        setTimeout(() => {
+          this._stopCapture();
+        }, 500);
+      }
     });
   }
 
