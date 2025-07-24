@@ -93,7 +93,7 @@
     "format:json": "prettier --write --parser json './**/*.json'",
     "format:md": "prettier --write --parser markdown './**/*.md'",
     "format": "run-s lint:js:fix lint:css:fix format:js format:css format:json format:md",
-    "prepare": "husky install",
+
     "playwright:install": "npx playwright install && npx playwright install --with-deps chromium"
   },
   "devDependencies": {
@@ -114,7 +114,7 @@
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
-    "husky": "^8.0.3",
+
     "lint-staged": "^13.2.1",
     "nano-jsx": "^0.1.0",
     "node-watch": "^0.7.3",
