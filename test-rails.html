@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rails File Uploader Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .upload-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+
+        /* Ensure the uploader widget has proper sizing */
+        uc-file-uploader-regular {
+            display: block;
+            width: 100%;
+            min-height: 200px;
+        }
+        .config-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e8f4fd;
+            border-radius: 6px;
+        }
+        .config-section h3 {
+            margin-top: 0;
+            color: #0066cc;
+        }
+        .config-section label {
+            display: block;
+            margin: 10px 0 5px 0;
+            font-weight: 500;
+        }
+        .config-section input, .config-section select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .config-section button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .config-section button:hover {
+            background: #0052a3;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            background: #f0f8ff;
+            border-left: 4px solid #0066cc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Rails File Uploader Test</h1>
+
+        <div class="config-section">
+            <h3>Configuration</h3>
+            <label for="sourceList">Source List (comma-separated):</label>
+            <input type="text" id="sourceList" value="local, camera" placeholder="local, camera, url">
+
+            <label for="cameraModes">Camera Modes:</label>
+            <select id="cameraModes">
+                <option value="photo">Photo only</option>
+                <option value="video" selected>Video only</option>
+                <option value="photo, video">Photo and Video</option>
+            </select>
+
+            <label for="multiple">Multiple Files:</label>
+            <select id="multiple">
+                <option value="true">Yes</option>
+                <option value="false" selected>No</option>
+            </select>
+
+            <label for="accept">Accept File Types:</label>
+            <input type="text" id="accept" value="video/*" placeholder="video/*, image/*, etc.">
+
+            <label for="enableAudio">Enable Audio Recording:</label>
+            <select id="enableAudio">
+                <option value="true" selected>Yes</option>
+                <option value="false">No</option>
+            </select>
+
+            <button onclick="updateConfig()">Update Configuration</button>
+            <button onclick="resetConfig()">Reset to Defaults</button>
+        </div>
+
+        <div class="upload-section">
+            <h3>File Upload Widget</h3>
+                    <uc-file-uploader-regular ctx-name="rails-test"></uc-file-uploader-regular>
+        <uc-config ctx-name="rails-test" pubkey="2356194e7a5100adf411" debug camera-modes="video" accept="video/*" multiple="false" source-list="local, camera" remove-copyright></uc-config>
+        <uc-upload-ctx-provider ctx-name="rails-test"></uc-upload-ctx-provider>
+        </div>
+
+        <div class="status">
+            <h4>Status</h4>
+            <p>Development server running at: <strong>http://localhost:5173</strong></p>
+            <p>Widget loaded: <span id="widgetStatus">Checking...</span></p>
+            <p>Files selected: <span id="fileCount">0</span></p>
+        </div>
+    </div>
+
+        <script type="module">
+        import '@/solutions/file-uploader/regular/index.css';
+        import * as UC from './index.js';
+
+        // Define components
+        UC.defineComponents(UC);
+
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', () => {
+            const widgetStatus = document.getElementById('widgetStatus');
+            const fileCount = document.getElementById('fileCount');
+
+            // Check if widget is loaded
+            setTimeout(() => {
+                const widget = document.querySelector('uc-file-uploader-regular');
+                if (widget) {
+                    widgetStatus.textContent = '✅ Loaded';
+                    widgetStatus.style.color = 'green';
+                } else {
+                    widgetStatus.textContent = '❌ Not found';
+                    widgetStatus.style.color = 'red';
+                }
+            }, 1000);
+
+            // Listen for file changes
+            const ctxProvider = document.querySelector('uc-upload-ctx-provider');
+            if (ctxProvider) {
+                // Get the API to access collection state
+                const api = ctxProvider.getAPI();
+
+                ctxProvider.addEventListener('file-added', (e) => {
+                    const collectionState = api.getOutputCollectionState();
+                    fileCount.textContent = collectionState.totalCount;
+                });
+
+                ctxProvider.addEventListener('file-removed', (e) => {
+                    const collectionState = api.getOutputCollectionState();
+                    fileCount.textContent = collectionState.totalCount;
+                });
+            }
+        });
+
+        // Configuration functions
+                window.updateConfig = () => {
+            const sourceList = document.getElementById('sourceList').value;
+            const cameraModes = document.getElementById('cameraModes').value;
+            const multiple = document.getElementById('multiple').value;
+            const accept = document.getElementById('accept').value;
+            const enableAudio = document.getElementById('enableAudio').value;
+
+            const config = document.querySelector('uc-config');
+            if (config) {
+                config.setAttribute('source-list', sourceList);
+                config.setAttribute('camera-modes', cameraModes);
+                config.setAttribute('multiple', multiple);
+                config.setAttribute('accept', accept);
+                config.setAttribute('enable-audio-recording', enableAudio);
+            }
+        };
+
+        window.resetConfig = () => {
+            document.getElementById('sourceList').value = 'local, camera';
+            document.getElementById('cameraModes').value = 'video';
+            document.getElementById('multiple').value = 'false';
+            document.getElementById('accept').value = 'video/*';
+            document.getElementById('enableAudio').value = 'true';
+            window.updateConfig();
+        };
+    </script>
+</body>
+</html>
